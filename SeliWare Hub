@@ -177,6 +177,9 @@ end)
 Section:NewButton("Reset HipHeight", "ButtonIfo", function()
 game.Players.LocalPlayer.Character.Humanoid.HipHeight = 2
 end)
+local Section = Tab:NewSection("Health")
+Section:NewTextBox("Set Health", "TextboxInfo", function(txtgame:GetService("Workspace")["Sosatel_337"].Humanoid.MaxHealth = txt
+end)
 local Section = Tab:NewSection("Fov")
 Section:NewSlider("Fov Slider", "Adjust The Player FOV", 110, 80, function(s) -- 500 (MaxValue) | 0 (MinValue)
 game.Workspace.Camera.FieldOfView = s
