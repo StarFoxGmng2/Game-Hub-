@@ -307,180 +307,83 @@ getgenv().executed = true
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
-local AimbotEnabled, TeammateCheck, WallCheck = false, false, true
+local AimbotEnabled, TeammateCheck, WallCheck, Holding, AutoClickerEnabled, TriggerBot = false, false, true, false, false, false
 local FOV = 200
+local ToggleKey = Enum.KeyCode.RightShift
+local AutoClickerKey = Enum.KeyCode.X
+local AutoClickerSpeed = 50
+local UIVisible, FlyGuiEnabled, HitboxEnabled, GodModeEnabled = true, false, false, false
+local HitboxConnection
+_G.ESPToggle = false
+_G.NameESP = false
 local colourChosen = Color3.fromRGB(255, 255, 0)
-
-local Settings = {
-    HighlightESP = false,
-    NameESP = false,
-    BoxESP = false,
-    TracerESP = false,
-    HealthESP = false
-}
-
 local Section = Tab:NewSection("Aimbot")
-Section:NewToggle("Enable Aimbot", "", function(t) AimbotEnabled = t end)
-Section:NewToggle("Teammate Check", "", function(t) TeammateCheck = t end)
-AimbotSection:NewToggle("Wall Check", "", function(t) WallCheck = t end)
-local Section = Tab:NewSection("ESP")
-Section:NewToggle("Highlight", "", function(t) Settings.HighlightESP = t end)
-Section:NewToggle("Name", "", function(t) Settings.NameESP = t end)
-Section:NewToggle("Boxes", "", function(t) Settings.BoxESP = t end)
-Section:NewToggle("Tracers", "", function(t) Settings.TracerESP = t end)
-Section:NewToggle("Healthbar", "", function(t) Settings.HealthESP = t end)
-
-local function IsTeammate(p)
-    if not LocalPlayer.Team or not p.Team then return false end
-    return p.Team == LocalPlayer.Team
-end
-
-local function IsVisible(part)
-    local origin = Camera.CFrame.Position
-    local direction = (part.Position - origin)
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    rayParams.IgnoreWater = true
-    local result = workspace:Raycast(origin, direction, rayParams)
-    return result and result.Instance:IsDescendantOf(part.Parent)
-end
-
-local function GetClosestPlayer()
-    local closest, shortest = nil, FOV
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-            if TeammateCheck and IsTeammate(p) then continue end
-            local pos, onScreen = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
-            if not onScreen then continue end
-            if WallCheck and not IsVisible(p.Character.HumanoidRootPart) then continue end
-            local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-            if dist < shortest then
-                shortest = dist
-                closest = p
-            end
-        end
-    end
-    return closest
-end
-
-RunService.RenderStepped:Connect(function()
-    if AimbotEnabled then
-        local target = GetClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
-        end
-    end
+Section:NewToggle("Enable Aimbot", "", function(t)
+AimbotEnabled = t
+end)
+Section:NewToggle("Teammate Check", "", function(t)
+TeammateCheck = t
+end)
+Section:NewToggle("Wall Check", "", function(t)
+WallCheck = t
+end)
+Section:NewToggle("TriggerBot", "", function(t)
+TriggerBot = t
 end)
 
--- ESP System
-local Drawings = {}
-local function removeESP(p)
-    if Drawings[p] then
-        for _, obj in pairs(Drawings[p]) do
-            if typeof(obj) == "Instance" then obj:Destroy() else obj:Remove() end
-        end
-        Drawings[p] = nil
-    end
-end
+local Section = Tab:NewSection("ESP")
+Section:NewToggle("Name", "", function(t)
+_G.NameESP = t
+end)
+Section:NewToggle("Boxes", "", function(t)
+end)
+Section:NewToggle("Health", "", function(t)
+end)
+Section:NewToggle("Tracers", "", function(t)
+end)
+Section:NewToggle("Highlight", "", function(t)
+_G.ESPToggle = t
+end)
 
-local function createESP(p)
-    if Drawings[p] then return end
-    Drawings[p] = {
-        Box = Drawing.new("Square"),
-        Tracer = Drawing.new("Line"),
-        Health = Drawing.new("Line")
-    }
-
-    for _, d in pairs(Drawings[p]) do
-        d.Thickness = 1
-        d.Visible = false
-    end
-
-    if Settings.NameESP then
-        local gui = Instance.new("BillboardGui")
-        gui.Name = "NameESP"
-        gui.Size = UDim2.new(0, 200, 0, 50)
-        gui.StudsOffset = Vector3.new(0, 2, 0)
-        gui.AlwaysOnTop = true
-        local label = Instance.new("TextLabel", gui)
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.TextStrokeTransparency = 0.5
-        label.TextColor3 = Color3.new(1, 1, 1)
-        label.TextSize = 14
-        label.Text = p.Name
-        Drawings[p].Name = gui
-    end
-
-    if Settings.HighlightESP and p.Character then
-        local h = Instance.new("Highlight")
-        h.Name = "Highlight"
-        h.Adornee = p.Character
-        h.FillColor = colourChosen
-        h.FillTransparency = 0.5
-        h.OutlineColor = Color3.fromRGB(255, 255, 255)
-        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        h.Parent = p.Character:FindFirstChild("HumanoidRootPart") or p.Character
-    end
-end
-
-RunService.RenderStepped:Connect(function()
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
-            createESP(p)
-            local root = p.Character.HumanoidRootPart
-            local hum = p.Character.Humanoid
-            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-            local scale = 1 / (root.Position - Camera.CFrame.Position).Magnitude * 100
-            local size = Vector2.new(2.5, 3.8) * scale * 100
-            local tl = Vector2.new(pos.X - size.X / 2, pos.Y - size.Y / 2)
-            local br = Vector2.new(pos.X + size.X / 2, pos.Y + size.Y / 2)
-            local color = IsTeammate(p) and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-
-            if Drawings[p] then
-                if Settings.BoxESP then
-                    local box = Drawings[p].Box
-                    box.Position = tl
-                    box.Size = size
-                    box.Color = color
-                    box.Visible = onScreen
-                else Drawings[p].Box.Visible = false end
-
-                if Settings.TracerESP then
-                    local line = Drawings[p].Tracer
-                    line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                    line.To = Vector2.new(pos.X, pos.Y)
-                    line.Color = color
-                    line.Visible = onScreen
-                else Drawings[p].Tracer.Visible = false end
-
-                if Settings.HealthESP then
-                    local hp = hum.Health / hum.MaxHealth
-                    local bar = Drawings[p].Health
-                    bar.From = Vector2.new(tl.X - 2, br.Y)
-                    bar.To = Vector2.new(tl.X - 2, tl.Y + (br.Y - tl.Y) * (1 - hp))
-                    bar.Color = Color3.fromRGB(0, 255, 0)
-                    bar.Visible = onScreen
-                else Drawings[p].Health.Visible = false end
-
-                if Settings.NameESP and Drawings[p].Name then
-                    Drawings[p].Name.Adornee = root
-                    Drawings[p].Name.Parent = root
-                elseif Drawings[p].Name then
-                    Drawings[p].Name:Destroy()
+local Section = Tab:NewSection("General PVP")
+Section:NewToggle("HitBox Expander", "", function(t)
+    HitboxEnabled = t
+    if t then
+        _G.HeadSize = 20
+        _G.Disabled = false
+        HitboxConnection = RunService.RenderStepped:Connect(function()
+            for _, v in pairs(Players:GetPlayers()) do
+                if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                    pcall(function()
+                        local hrp = v.Character.HumanoidRootPart
+                        hrp.Size = Vector3.new(_G.HeadSize, _G.HeadSize, _G.HeadSize)
+                        hrp.Transparency = 0.7
+                        hrp.BrickColor = BrickColor.new("Really black")
+                        hrp.Material = Enum.Material.Neon
+                        hrp.CanCollide = false
+                    end)
                 end
             end
-        else
-            removeESP(p)
-        end
+        end)
+    else
+        if HitboxConnection then HitboxConnection:Disconnect() end
+        HitboxConnection = nil
+        _G.Disabled = true
     end
 end)
-
-Players.PlayerRemoving:Connect(removeESP)
+Section:NewSlider("HitBox Size", "", 10, 50, function(t)
+_G.HeadSize = t
+end)
+Section:NewToggle("AutoClicker", "Toggles AutoClicker on/off", function(t)
+AutoClickerEnabled = t
+end)
+Section:NewSlider("AutoClicker Speed (ms)", "Speed of AutoClicker", 5, 50, function(t)
+AutoClickerSpeed = t
+end)
 local Section = Tab:NewSection("--> End <--")
 
 local Tab = Window:NewTab("Scripts")
